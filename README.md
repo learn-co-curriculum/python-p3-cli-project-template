@@ -231,8 +231,6 @@ Happy coding!
 
 ***
 
-***
-
 ## Resources
 
 - [Setting up a respository - Atlassian](https://www.atlassian.com/git/tutorials/setting-up-a-repository)
