@@ -80,8 +80,7 @@ your local repo, choose whether you would like it to be public or private, make
 sure "Initialize this repository with a README" is unchecked (you already have
 one), then click "Create repository".
 
-Head back to the command line and enter `git remote add <project name> <github
-url>`. This will map the remote repository to your local repository. Finally,
+Head back to the command line and enter `git remote add origin <github url>`. This will map the remote repository to your local repository. Next enter, `git branch -M main` to rename the current branch to `main`. Then finally,
 push your first commit with `git push -u origin main`.
 
 Your project is now version-controlled locally and online. This will allow you
