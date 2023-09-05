@@ -7,7 +7,7 @@ from lib.models import Session
 from datetime import date
 
 API_ENDPOINT = "https://api.openai.com/v1/chat/completions"
-API_KEY = "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"
+API_KEY = ""
 
 
 class LanguageBuddy:
