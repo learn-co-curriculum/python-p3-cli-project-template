@@ -3,15 +3,18 @@ from colorama import Fore
 import time
 import requests
 import json
+from lib.models import Session
+from datetime import date
 
 API_ENDPOINT = "https://api.openai.com/v1/chat/completions"
-API_KEY = "PLACEHOLDER"
+API_KEY = "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"
 
 
 class LanguageBuddy:
 
     source_language = "English"
     target_language = "Russian"
+    difficulty = 'C2 (Advanced)'
 
     def run(self):
         print("Welcome to Language Buddy!")
@@ -83,9 +86,14 @@ class LanguageBuddy:
             else:
                 print("Invalid input. Please select a supported language")
 
-
     def view_stats(self):
-        pass
+        print(f"POINTS EARNED:\t\t{Session.total_points_earned()}")
+        print(f"POINTS ATTEMPTED:\t{Session.total_points_attempted()}")
+        print(f"TOTAL SESSIONS:\t\t{Session.count_sessions()}")
+        print(f"TOTAL LANGUAGES: \t{Session.count_distinct_languages()}")
+        print(f"ACCURACY:\t\t{(Session.accuracy()*100):.2f}%")
+        print(f"HIGH SCORE:\t\t{Session.session_high_score()}")
+        self.main_menu()
 
     def train(self):
         TRAINING_OPTIONS = {
@@ -120,20 +128,20 @@ class LanguageBuddy:
             pass
 
     def translate(self):
-        # Generate a source-language sentence for user to translate:
+        # Generate a sentence for user to translate:
         # ex., "The cat is on the roof."
         # Then, user inputs translation.
         # Via OpenAI API, we evaluate translation and return comments.
-        # Comments may include praise ("Great job!"), corrections
-        # ("Not quite -- a better translation is ..."), encouragement ("You've translated 10 sentences today!").
-        # As long as user doesn't press i.e., 'Quit', we keep going
-        # Store sentence and translation in db, or store points in db
-        # Ideas: show accuracy percentage; show progress towards goal
-        # #
+
+        session = Session(date.today(), self.target_language, self.difficulty, 'translation', 0, 0)
+        session.save()
+
         print(f"""Let's do some translation exercises. 
               EXIT: 'exit'
               RETURN TO MAIN MENU: 'menu'
             """)
+        
+        self.session_points = 0
 
         while True:
         
@@ -147,7 +155,7 @@ class LanguageBuddy:
                 "model": "gpt-3.5-turbo",
                 "messages": [{
                     "role": "user", 
-                    "content": f"You are my {self.target_language} language tutor. We are doing a translation exercise. Give me a {self.target_language} sentence to translate into English. The difficulty of this sentence should be C2 (Advanced). Return only the sentence for translation; include no other content."
+                    "content": f"You are my {self.target_language} language tutor. We are doing a translation exercise. Give me a {self.target_language} sentence to translate into English. The difficulty of this sentence should be {self.difficulty}. Sentences should be creative, expressive, and interesting. Return only the sentence for translation; include no other content."
                 }],
                 "temperature": 0.7
             }
@@ -165,6 +173,7 @@ class LanguageBuddy:
 
             user_input = input(">>> ")
 
+            
             if (user_input == "exit"):
                 break
             elif (user_input == "menu"):
@@ -177,22 +186,46 @@ class LanguageBuddy:
                 "model": "gpt-3.5-turbo",
                 "messages": [{
                     "role": "user", 
-                    "content": f"You are my ${self.target_language} language tutor. We are doing a translation exercise. You gave me the following {self.target_language} to translate into {self.source_language}: {sentence_for_translation}. Here is my translation: {user_translation}. Grade the translation out of 2 points. An incorrect or missing translation should receive 0 points; a partially correct translation should receive 1; and a correct translation should receive 2. Give me concise feedback focusing on errors."
+                    "content": f"You are my ${self.target_language} language tutor. We are doing a translation exercise. You gave me the following {self.target_language} to translate into {self.source_language}: {sentence_for_translation}. Here is my translation: \"{user_translation}\". Give me concise feedback focusing on errors."
+                }],
+                "temperature": 0.7
+            }
+            get_score_data = {
+                "model": "gpt-3.5-turbo",
+                "messages": [{
+                    "role": "user", 
+                    "content": f"You are my ${self.target_language} language tutor. We are doing a translation exercise. You gave me the following {self.target_language} to translate into {self.source_language}: {sentence_for_translation}. Here is my translation: {user_translation}. Grade the translation out of 1 point. An incorrect or missing translation should receive 0 points; a partially correct translation should receive 0.5; a nearly correct translation should receive 0.75; and a correct translation should receive 1. Return only the numerical score. Do not return any other text."
                 }],
                 "temperature": 0.7
             }
 
             # Make the POST request
-            response = requests.post(API_ENDPOINT, headers=headers, data=json.dumps(get_feedback_data))
+            feedback_response = requests.post(API_ENDPOINT, headers=headers, data=json.dumps(get_feedback_data))
+            score_response = requests.post(API_ENDPOINT, headers=headers, data=json.dumps(get_score_data))
 
             # Get the JSON response
-            response_data = response.json()
+            feedback_response_data = feedback_response.json()
+            score_response_data = score_response.json()
 
             # Extract the sentence
-            tutor_feedback = response_data['choices'][0]['message']['content']
-            print(tutor_feedback)
-        
+            feedback = feedback_response_data['choices'][0]['message']['content']
+            points = int(score_response_data['choices'][0]['message']['content'])
+            # self.session_points = self.session_points + points
+            session.points_earned = session.points_earned + points
+            session.points_possible = session.points_possible + 1
+            print(f"POINTS: {points}")
+            print(f"FEEDBACK: {feedback}")
+            print(f"STATS: {session.points_earned} / {session.points_possible} = {100 * (session.points_earned / session.points_possible):.2f}%")
 
+            session.save()
+
+            play_again = input("Go again (y/n)?\n>>>")
+            if play_again == 'y':
+                continue
+            else: 
+                self.view_stats()
+                break
+        
     def vocab_game(self):
         # We could get words from word list and have OpenAI API provide definitions;
         # Or, we could just have the OpenAI API pick the word
@@ -205,3 +238,5 @@ class LanguageBuddy:
         # in sqlite db and can be reviewed via flashcards.
         # We may pull definitions in via a dictionary API or via OpenAI#
         pass
+
+    
