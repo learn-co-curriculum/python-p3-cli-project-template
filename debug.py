@@ -1,4 +1,5 @@
 from lib.models import Session, Flashcard
+from lib.language_buddy import HEADERS, LanguageBuddy
 import textwrap
 
 from colorama import Fore, Style
@@ -14,6 +15,9 @@ flashcard_2 = Flashcard("Textbook A", "2023-09-07", "Spanish", "Beginner", "come
 flashcard_3 = Flashcard("Textbook A", "2023-09-07", "Spanish", "Beginner", "bailar", "to dance", "To move rhythmically to music", "Ella le encanta bailar salsa.", 3)
 flashcard_4 = Flashcard("Textbook B", "2023-09-07", "Russian", "Beginner", "кот", "cat", "A domesticated feline", "Это мой кот, Миша.", 4)
 flashcard_5 = Flashcard("Textbook B", "2023-09-07", "Russian", "Beginner", "бассейн", "pool", "A place for swimming", "Дети играют в бассейне.", 5)
+
+
+app = LanguageBuddy()
 
 import ipdb; ipdb.set_trace()
 
