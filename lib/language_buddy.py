@@ -5,11 +5,12 @@ import textwrap
 import requests
 import json
 from sys import exit
-from lib.models import Session
+from lib.models import Session, Flashcard
 from datetime import date
+from ast import literal_eval
 
 API_ENDPOINT = "https://api.openai.com/v1/chat/completions"
-API_KEY = ""
+API_KEY = "PLACEHOLDER"
 HEADERS = {
     "Content-Type": "application/json",
     "Authorization": f"Bearer {API_KEY}"
@@ -25,6 +26,8 @@ def RED(str):
     return f"{Fore.RED}" + str + f"{Fore.RESET}"
 def MAGENTA(str):
     return f"{Fore.MAGENTA}" + str + f"{Fore.RESET}"
+def YELLOW(str):
+    return f"{Fore.YELLOW}" + str + f"{Fore.RESET}"
 def BRIGHT(str):
     return f"{Style.BRIGHT}" + str + f"{Style.RESET_ALL}"
 
@@ -34,7 +37,7 @@ BLUE_SELECT_OPTION = BLUE("\nSelect an option:\n")
 INVALID_INPUT = BRIGHT(RED("\nInvalid input. Please try again.\n"))
 GO_AGAIN = BLUE("""
         -----------------------------    
-        Go again? (y/n)
+        ENTER to continue; '.' to return to MENU
         -----------------------------
 """)
 
@@ -43,8 +46,7 @@ class LanguageBuddy:
     source_language = "English"
     target_language = "Spanish"
     difficulty = 'A1 (Beginner)'
-    custom_instructions = "Sentences should be creative, expressive, interesting, and unlikely to repeat."
-    vocab_custom_instructions = "Pick words that are interesting, creative, and unlikely to repeat."
+    custom_instructions = "Exercises should be creative, expressive, interesting, and unlikely to repeat."
     feedback_custom_instructions = "Give me concise feedback focusing on errors. Do not include unnecessary praise or fluff."
 
     def run(self):
@@ -101,10 +103,7 @@ class LanguageBuddy:
             else:
                 print(INVALID_INPUT)
 
-        try:
-            MAIN_MENU_OPTIONS[self.user_input]()
-        except:
-            pass
+        MAIN_MENU_OPTIONS[self.user_input]()
 
     def settings(self):
         SETTINGS_MENU_TEXT = f"""
@@ -186,6 +185,8 @@ class LanguageBuddy:
         Language Buddy uses gpt-3.5-turbo, which 
         provides support for Spanish, Portuguese, 
         Russian, Mandarin, and French, among others. 
+
+        CANCEL to return to settings menu.
         -----------------------------
 
         """
@@ -193,10 +194,11 @@ class LanguageBuddy:
         while True:
             
             self.user_input = input(CARROTS)
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {API_KEY}"
-            }
+
+            if self.user_input.lower() == "cancel":
+                break
+
+            
             validate_language_data = {
                 "model": "gpt-3.5-turbo",
                 "messages": [{
@@ -207,7 +209,7 @@ class LanguageBuddy:
             }
             # Make the POST request
             response = requests.post(
-                API_ENDPOINT, headers=headers, data=json.dumps(validate_language_data))
+                API_ENDPOINT, headers=HEADERS, data=json.dumps(validate_language_data))
 
             # Get the JSON response
             response_data = response.json()
@@ -216,12 +218,14 @@ class LanguageBuddy:
             language_validated = True if response_data['choices'][0]['message']['content'] == 'TRUE' else False
 
             if language_validated:
-                self.target_language = self.user_input
+                self.target_language = self.user_input.title()
                 print(BLUE(f"\nYour language has been set to {self.target_language}\n"))
-                self.settings()
                 break
             else:
                 print(INVALID_INPUT)
+
+        # Return to settings menu after cancelling or successfully setting language
+        self.settings()
 
     def view_stats(self):
 
@@ -280,10 +284,7 @@ class LanguageBuddy:
             else:
                 print(INVALID_INPUT)
 
-        try:
-            TRAINING_OPTIONS[self.user_input]()
-        except:
-            pass
+        TRAINING_OPTIONS[self.user_input]()
 
     def translation_menu(self):
         TRANSLATION_MENU_TEXT = BLUE("""
@@ -321,15 +322,14 @@ class LanguageBuddy:
               
         -----------------------------
         Enter custom instructions. For best results, use full sentences beginning "I want to practice ... ",
-        "Sentences should ...", "Feedback should ...", etc
+        "Sentences should ...", "Give me ...", "Feedback should ...", etc
             Ex., "I want to practice food vocabulary."
-            Ex., "I want to practice questions with interrogative pronouns."
+            Ex., "Sentences should be creative, expressive, interesting, and unlikely to repeat."
             Ex., "Sentences should use advanced computer science vocabulary."
-            Ex., "Sentences should be at least 20 words in length."
-            Ex., "Feedback should rhyme."
+            Ex., "Give me concise feedback focusing on errors. Do not include unnecessary praise or fluff."
         -----------------------------
 
-        Enter custom instructions for sentences:  
+        Enter custom instructions for exercises:  
                   
         """)
         print(INSTRUCTIONS)
@@ -359,7 +359,17 @@ class LanguageBuddy:
 
         -----------------------------
         Translate the following sentence 
-        from {self.target_language} to {self.source_language}
+        from {self.target_language} to {self.source_language}.
+
+        Add flashcards at any time by typing 'flashcard [word]'.
+        -----------------------------
+
+        """)
+
+        FLASHCARD_ADDED = BLUE(f"""
+
+        -----------------------------
+        Flashcard added. Add another flashcard or continue exercise.
         -----------------------------
 
         """)
@@ -372,13 +382,30 @@ class LanguageBuddy:
             print(formatted_gpt_sentence)
 
             user_translation = input(CARROTS)
+
+            while user_translation.lower().startswith('flashcard'):
+                # create a flashcard
+                word = user_translation[10:]
+                self.add_flashcard('translation', word, gpt_sentence)
+                print(FLASHCARD_ADDED)
+                user_translation = input(CARROTS)
+
             feedback = self.get_feedback_for_translation(gpt_sentence, user_translation)
-            points = self.get_points_for_translation(gpt_sentence, user_translation) * 0.01
+            points = self.get_points_for_translation(gpt_sentence, user_translation)
 
             
-            session.points_earned = session.points_earned + points
+            session.points_earned = session.points_earned + points * 0.01
             session.points_possible = session.points_possible + 1
-            print(f"\nPOINTS: {points}\n")
+
+            print("\n")
+            if points == 100:
+                print(BRIGHT(GREEN(f"CORRECT! {points}%")))
+            elif points >= 80:
+                print(BRIGHT(YELLOW(f"ALMOST ... {points}%")))
+            elif points >= 60:
+                print(BRIGHT(LIGHTRED(f"NOT QUITE ... {points}%")))
+            else:
+                print(BRIGHT(RED(f"INCORRECT: {points}%")))
             FORMATTED_FEEDBACK = BRIGHT(MAGENTA(f"""
 FEEDBACK:
 {self.format_text(feedback)}
@@ -386,16 +413,15 @@ FEEDBACK:
 """))
             print(FORMATTED_FEEDBACK)
             print(
-                f"STATS: {session.points_earned} / {session.points_possible} = {100 * (session.points_earned / session.points_possible):.2f}%")
+                f"STATS: {session.points_earned} / {session.points_possible} = {(session.points_earned / session.points_possible):.2f}%")
 
             session.save()
 
             print(GO_AGAIN)
             play_again = input(CARROTS)
-            if play_again == 'y':
-                continue
-            else:
+            if play_again == '.':
                 break
+            
         self.translation_menu()
 
     def get_sentence_for_translation(self):
@@ -433,11 +459,12 @@ FEEDBACK:
         return feedback
 
     def get_points_for_translation(self, gpt_sentence, user_translation):
+        CONTENT = f"Grade the following translation out of 100 points, where 100 is perfect. A translation with meaningful errors should receive no more than 70 points. A nonsensical translation should receive 0 points. Return only the number of points awarded. Do not return any other text. Source text: '{gpt_sentence} Translation: '{user_translation}'"
         get_score_data = {
             "model": "gpt-3.5-turbo",
             "messages": [{
                 "role": "user",
-                "content": f"You are my ${self.target_language} language tutor. We are doing a translation exercise. You gave me the following {self.target_language} to translate into {self.source_language}: {gpt_sentence}. Here is my translation: {user_translation}. Grade the translation out of 100 points, where 100 is perfect. A nonsensical or very incorrect translation should always receive 0 points. Return only the numerical score. Do not return any other text."
+                "content": CONTENT
             }],
             "temperature": 0.7
         }
@@ -482,17 +509,19 @@ FEEDBACK:
             print(f"\nTOTAL POINTS: {session.points_earned}\n")
             session.save()
             self.user_input = input(GO_AGAIN)
-            if self.user_input == 'n':
-                self.training_menu()
+            if self.user_input == '.':
+                break
+        
+        self.training_menu()
 
     def vocab_exercise(self):
         conversation = []
         prompt = (""
-        f"You are my {self.target_language} tutor and we are playing a vocabulary game. "
+        f"You are my {self.target_language} tutor and we are doing a vocabulary exercise. "
         f"You give me a clue in  describing a word; I guess the word. "
         f"Your clue should be 3-5 sentences long and appropriate for a learner at the {self.difficulty} level. "
         f"You must use ONLY {self.target_language}. Return ONLY the clue; include no other text."
-        f"{self.vocab_custom_instructions}"
+        f"{self.custom_instructions}"
         "")
         get_data = {
             "model": "gpt-3.5-turbo",
@@ -513,7 +542,7 @@ FEEDBACK:
         self.user_input = input(CARROTS)
 
         prompt = (
-            f"You are my {self.target_language} tutor and we are playing a vocabulary game. "
+            f"You are my {self.target_language} tutor and we are doing a vocabulary exercise. "
             f"You gave me the following clue: {gpt_response} "
             f"Here is my guess: {self.user_input}"
             f"Is this guess correct? Give feedback in {self.target_language}. If my answer is wrong, tell me the correct answer and its English translation."
@@ -542,11 +571,32 @@ FEEDBACK:
         pass
 
     # TODO 9/7 HALLIE -- implement add flashcard & integrate into translate, vocab exercises
-    def add_flashcard(self):
-        # Users can add words to flashcards from any app stage. Words are stored
-        # in sqlite db and can be reviewed via flashcards.
-        # We may pull definitions in via a dictionary API or via OpenAI#
-        pass
+    def get_flashcard_content(self, word):
+        CONTENT = (f"Return a tuple (English translation, {self.target_language} definition) "
+                   f"for the {self.target_language} word '{word}'. Return ONLY the tuple.")
+        # Send OpenAI a request for a Flashcard initialization
+        get_flashcard_data = {
+            "model": "gpt-3.5-turbo",
+            "messages": [{
+                "role": "user",
+                "content": CONTENT
+            }],
+            "temperature": 0.7
+        }
+        # Make the POST request
+        response = requests.post(
+            API_ENDPOINT, headers=HEADERS, data=json.dumps(get_flashcard_data))
+        # Get the JSON response
+        response_data = response.json()
+        # Extract the translation, definition
+        (translation, definition) = literal_eval(response_data['choices'][0]['message']['content'])
+        return (translation, definition)
+    
+    def add_flashcard(self, origin, word, example):
+        (translation, definition) = self.get_flashcard_content(word)
+        flashcard = Flashcard(origin, date.today(), self.target_language, self.difficulty, word, translation, definition, example)
+        flashcard.create()
+
     # This function was generated by ChatGPT
     def format_text(self, text, width=80):
         """Formats text for terminal display with a given width."""
