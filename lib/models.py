@@ -150,6 +150,112 @@ class Session:
         return high_score
         
 
+class Flashcard:
+    def __init__(self, origin, date, language, level, word, translation, definition, example, id=None):
+        self.origin = origin
+        self.date = date
+        self.language = language
+        self.level = level
+        self.word = word
+        self.translation = translation
+        self.definition = definition
+        self.example = example
+        self.id = id
+
+    def __repr__(self):
+        return (f"Flashcard(origin={self.origin!r}, date={self.date!r}, language={self.language!r}, "
+                f"level={self.level!r}, word={self.word!r}, translation={self.translation!r}, "
+                f"definition={self.definition!r}, example={self.example!r}, id={self.id!r})")
+
+    # SQL METHODS
+    @classmethod
+    def create_table(cls):
+        sql = """CREATE TABLE IF NOT EXISTS flashcards (
+        id INTEGER PRIMARY KEY,
+        origin TEXT,
+        date TEXT,
+        language TEXT,
+        level TEXT,
+        word TEXT,
+        translation TEXT,
+        definition TEXT,
+        example TEXT
+        )
+        """
+        CURSOR.execute(sql)
+
+    def create(self):
+        sql = """INSERT INTO flashcards (origin, date, language, level, word, translation, definition, example)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        CURSOR.execute(sql, [self.origin, self.date, self.language, self.level, self.word, self.translation, self.definition, self.example])
+        CONN.commit()
+
+        self.id = CURSOR.lastrowid
+        pass
+
+    def delete(self):
+        sql = """
+        DELETE FROM flashcards
+        WHERE id = ?
+        """
+        CURSOR.execute(sql, [self.id])
+        CONN.commit()
+
+    @classmethod
+    def delete_by_id(cls, id):
+        sql = """
+        DELETE FROM flashcards
+        WHERE id = ?
+        """
+        CURSOR.execute(sql, [id])
+        CONN.commit()
+
+    def update(self):
+        sql = """
+        UPDATE flashcards
+        SET origin = ?,
+        date = ?,
+        language = ?,
+        level = ?,
+        word = ?,
+        translation = ?,
+        definition = ?,
+        example = ?
+        WHERE id = ?
+        """
+        CURSOR.execute(sql, [self.origin, self.date, self.language, self.level, self.word, self.translation, self.definition, self.example, self.id])
+        CONN.commit()
+
+    @classmethod
+    def query_all(cls):
+        sql = """SELECT * FROM flashcards"""
+        return [Flashcard(origin, date, language, level, word, translation, definition, example, id) 
+                for (id, origin, date, language, level, word, translation, definition, example) 
+                in CURSOR.execute(sql).fetchall()] 
+
+    @classmethod
+    def query_by_id(cls, id):
+        sql = """
+        SELECT * FROM flashcards 
+        WHERE id = ?
+        """
+        
+        (id, origin, date, language, level, word, translation, definition, example)  = CURSOR.execute(sql, [id]).fetchone()
+        return Flashcard(origin, date, language, level, word, translation, definition, example, id)
+
+    @classmethod
+    def query_by_lang_and_level(cls, lang, level):
+        sql = """
+        SELECT * FROM flashcards
+        WHERE language = ?
+        AND level = ?
+        """
+        return [Flashcard(origin, date, language, level, word, translation, definition, example, id) 
+                for (id, origin, date, language, level, word, translation, definition, example) 
+                in CURSOR.execute(sql, [lang, level]).fetchall()]
+
+    
 
 
 
